@@ -1,0 +1,1276 @@
+---
+import StarlightNav from '../../../components/StarlightNav.astro';
+import fs from 'fs';
+import path from 'path';
+
+export function getStaticPaths() {
+  const modelsDir = path.join(process.cwd(), 'public', 'models');
+  const paths = [];
+  
+  try {
+    // Get all directories in public/models
+    const items = fs.readdirSync(modelsDir, { withFileTypes: true });
+    const collections = items
+      .filter(item => item.isDirectory())
+      .map(dir => dir.name);
+    
+    // Add paths for each collection
+    collections.forEach(collection => {
+      paths.push({ params: { slug: collection } });
+    });
+  } catch (error) {
+    console.warn('Could not read models directory:', error.message);
+  }
+  
+  return paths;
+}
+
+const { slug } = Astro.params;
+const collection = slug;
+
+// Get models for this collection
+function getCollectionModels(collectionName) {
+  const modelsDir = path.join(process.cwd(), 'public', 'models', collectionName);
+  try {
+    const files = fs.readdirSync(modelsDir);
+    return files.filter(file => file.endsWith('.glb') || file.endsWith('.gltf'));
+  } catch (error) {
+    return [];
+  }
+}
+
+const collectionModels = getCollectionModels(collection);
+
+// Format collection name for display
+function formatCollectionName(name) {
+  if (name.toLowerCase() === 'balora') {
+    return 'Balora LTD';
+  }
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+const displayName = formatCollectionName(collection);
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>SiliconWit.COM 3D Model Viewer - {slug}</title>
+    <meta name="description" content="A professional 3D model viewer for GLB and GLTF files - by SiliconWit.COM">
+    <meta name="theme-color" content="#4361ee">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <style>
+        
+        :root {
+            --primary-color: #4361ee;
+            --primary-light: rgba(67, 97, 238, 0.1);
+            --accent-color: #3a0ca3;
+            --text-color: #2b2d42;
+            --text-light: #6c757d;
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --success: #06d6a0;
+            --warning: #ffd166;
+            --error: #ef476f;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body { 
+            font-family: 'PalatinoLinotype', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+            height: 100vh;
+            height: calc(var(--vh, 1vh) * 100);
+            display: flex;
+            flex-direction: column;
+            touch-action: manipulation;
+        }
+
+        .main-container {
+            flex: 1;
+            display: flex;
+            position: relative;
+        }
+
+        .sidebar {
+            width: 320px;
+            background-color: var(--card-bg);
+            box-shadow: var(--shadow);
+            z-index: 90;
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .sidebar-tabs {
+            display: flex;
+            border-bottom: 1px solid #eee;
+        }
+
+        .sidebar-tab {
+            flex: 1;
+            text-align: center;
+            padding: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-weight: 500;
+            font-size: 14px;
+            color: var(--text-light);
+            position: relative;
+        }
+
+        .sidebar-tab.active {
+            color: var(--primary-color);
+        }
+
+        .sidebar-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background-color: var(--primary-color);
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .sidebar-section {
+            margin-bottom: 25px;
+            display: none;
+        }
+
+        .sidebar-section.active {
+            display: block;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: var(--text-color);
+        }
+
+        .upload-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .upload-box {
+            border: 2px dashed #e0e0e0;
+            border-radius: 8px;
+            padding: 25px 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .upload-box:hover {
+            border-color: var(--primary-color);
+            background-color: var(--primary-light);
+        }
+
+        .upload-box svg {
+            width: 36px;
+            height: 36px;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        .upload-box p {
+            font-size: 14px;
+            color: var(--text-light);
+        }
+
+        .upload-info {
+            font-size: 13px;
+            color: var(--text-light);
+            text-align: center;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .model-selector {
+            margin-bottom: 20px;
+        }
+
+        .model-buttons {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        .model-btn {
+            padding: 12px;
+            background: var(--primary-light);
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .model-btn:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .model-btn.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .control-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 22px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #e0e0e0;
+            transition: .4s;
+            border-radius: 22px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        input:checked + .toggle-slider {
+            background-color: var(--primary-color);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(22px);
+        }
+
+        .viewer-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #scene-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        .status-bar {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-bar.visible {
+            opacity: 1;
+        }
+
+        .status-icon {
+            width: 16px;
+            height: 16px;
+        }
+
+        .toolbar {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 50;
+        }
+
+        .tool-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background-color: white;
+            border: none;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+            color: var(--text-color);
+        }
+
+        .tool-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+            color: var(--primary-color);
+        }
+
+        .tool-btn.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .toggle-sidebar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 95;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background-color: white;
+            box-shadow: var(--shadow);
+            border: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: var(--transition);
+            color: var(--text-color);
+            display: none;
+        }
+
+        .toggle-sidebar:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+            color: var(--primary-color);
+        }
+
+        .loading-spinner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            display: none;
+            z-index: 100;
+        }
+
+        .spinner {
+            width: 100%;
+            height: 100%;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        .spinner-text {
+            position: absolute;
+            top: 120%;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            color: var(--text-color);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column-reverse;
+            gap: 10px;
+            z-index: 1000;
+        }
+
+        .toast {
+            padding: 12px 16px;
+            border-radius: 8px;
+            background-color: white;
+            box-shadow: var(--shadow-lg);
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+            max-width: 350px;
+        }
+
+        .toast.visible {
+            transform: translateX(0);
+        }
+
+        .toast-success {
+            border-left: 4px solid var(--success);
+        }
+
+        .toast-warning {
+            border-left: 4px solid var(--warning);
+        }
+
+        .toast-error {
+            border-left: 4px solid var(--error);
+        }
+
+        .toast-icon {
+            flex-shrink: 0;
+        }
+
+        .toast-content {
+            flex: 1;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .toast-message {
+            color: var(--text-light);
+            font-size: 13px;
+        }
+
+        .model-info {
+            padding: 15px;
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            font-size: 13px;
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            max-width: 250px;
+            max-height: calc(100vh - 180px);
+            overflow-y: auto;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 50;
+        }
+
+        .model-info.visible {
+            opacity: 1;
+        }
+
+        .model-info h4 {
+            font-size: 14px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .model-info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .model-info-label {
+            color: var(--text-light);
+        }
+
+        .model-info-value {
+            font-weight: 500;
+        }
+
+        /* Responsive Styles */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: absolute;
+                height: 100%;
+                height: calc(var(--vh, 1vh) * 100);
+                transform: translateX(-100%);
+                z-index: 150;
+                width: 85%;
+                max-width: 320px;
+                box-shadow: var(--shadow-lg);
+            }
+            
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            
+            .toggle-sidebar {
+                display: flex;
+                z-index: 151;
+            }
+            
+            .toolbar {
+                top: 20px;
+                right: 10px;
+            }
+            
+            .tool-btn {
+                width: 44px;
+                height: 44px;
+            }
+            
+            .status-bar {
+                left: 50%;
+                transform: translateX(-50%);
+                bottom: 15px;
+                white-space: nowrap;
+            }
+            
+            .model-info {
+                max-width: 90%;
+                left: 50%;
+                right: auto;
+                transform: translateX(-50%);
+                bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <StarlightNav />
+
+    <div class="main-container">
+        <button class="toggle-sidebar" id="toggle-sidebar">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </button>
+
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-tabs">
+                <div class="sidebar-tab active" data-tab="models">Models</div>
+                <div class="sidebar-tab" data-tab="upload">Upload</div>
+                <div class="sidebar-tab" data-tab="settings">Settings</div>
+            </div>
+            
+            <div class="sidebar-content">
+                <!-- Models Tab -->
+                <div class="sidebar-section active" id="models-section">
+                    <div class="model-selector">
+                        <div class="section-title">{displayName} Models</div>
+                        <div class="model-buttons" id="model-buttons">
+                            {collectionModels.map(modelFile => {
+                                const modelName = modelFile.replace(/\.(glb|gltf)$/i, '');
+                                const displayModelName = modelName.replace(/[-_]/g, ' ')
+                                  .split(' ')
+                                  .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                                  .join(' ');
+                                return (
+                                  <button class="model-btn" data-model={modelFile}>
+                                    {displayModelName}
+                                  </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Upload Tab -->
+                <div class="sidebar-section" id="upload-section">
+                    <div class="upload-container">
+                        <div class="upload-box" id="upload-box">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            <p>Drag & drop your 3D model here<br>or click to browse</p>
+                        </div>
+                        <input type="file" id="file-input" class="file-input" accept=".glb,.gltf">
+                        <p class="upload-info">Supports GLB and GLTF files</p>
+                    </div>
+                </div>
+
+                <!-- Settings Tab -->
+                <div class="sidebar-section" id="settings-section">
+                    <div class="section-title">Display Settings</div>
+                    
+                    <div class="control-group">
+                        <div class="control-row">
+                            <span class="control-label">Auto Rotate</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="auto-rotate">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <div class="control-row">
+                            <span class="control-label">Wireframe Mode</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="wireframe">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <div class="control-row">
+                            <span class="control-label">Show Grid</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="show-grid">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <div class="control-row">
+                            <span class="control-label">Show Shadows</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="show-shadows" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="viewer-container">
+            <div id="scene-container"></div>
+            
+            <div class="toolbar">
+                <button class="tool-btn" id="reset-camera" title="Reset Camera Position">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                        <path d="M21 3v5h-5"></path>
+                        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                        <path d="M8 16H3v5"></path>
+                    </svg>
+                </button>
+                <button class="tool-btn" id="screenshot" title="Take Screenshot">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                </button>
+                <button class="tool-btn" id="fullscreen" title="Toggle Fullscreen">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
+                        <path d="M21 8V5a2 2 0 0 0-2-2h-3"></path>
+                        <path d="M3 16v3a2 2 0 0 0 2 2h3"></path>
+                        <path d="M16 21h3a2 2 0 0 0 2-2v-3"></path>
+                    </svg>
+                </button>
+                <button class="tool-btn" id="model-info-btn" title="Toggle Model Info">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="status-bar" id="status-bar">
+                <svg class="status-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M12 1v6m0 6v6"></path>
+                    <path d="m21 12-6 0m-6 0-6 0"></path>
+                </svg>
+                <span id="status-text">Ready</span>
+            </div>
+
+            <div class="loading-spinner" id="loading-spinner">
+                <div class="spinner"></div>
+                <div class="spinner-text">Loading model...</div>
+            </div>
+
+            <div class="model-info" id="model-info">
+                <h4>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                    </svg>
+                    Model Statistics
+                </h4>
+                <div class="model-info-item">
+                    <span class="model-info-label">Vertices:</span>
+                    <span class="model-info-value" id="vertices-count">0</span>
+                </div>
+                <div class="model-info-item">
+                    <span class="model-info-label">Triangles:</span>
+                    <span class="model-info-value" id="triangles-count">0</span>
+                </div>
+                <div class="model-info-item">
+                    <span class="model-info-label">Materials:</span>
+                    <span class="model-info-value" id="materials-count">0</span>
+                </div>
+                <div class="model-info-item">
+                    <span class="model-info-label">Textures:</span>
+                    <span class="model-info-value" id="textures-count">0</span>
+                </div>
+                <div class="model-info-item">
+                    <span class="model-info-label">File Size:</span>
+                    <span class="model-info-value" id="file-size">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        // Scene variables
+        let scene, camera, renderer, controls;
+        let currentModel = null;
+        let currentFileName = '';
+        let currentFileSize = 0;
+        const collection = '{collection}';
+        
+        // Settings
+        const settings = {
+            autoRotate: false,
+            rotationSpeed: 0.01,
+            wireframe: false,
+            backgroundColor: '#f0f0f0',
+            showGrid: false,
+            showShadows: true,
+            shadingStyle: 'standard',
+            environment: 'neutral',
+            isDarkMode: false
+        };
+
+        // DOM elements
+        const sceneContainer = document.getElementById('scene-container');
+        const fileInput = document.getElementById('file-input');
+        const uploadBox = document.getElementById('upload-box');
+        const statusBar = document.getElementById('status-bar');
+        const statusText = document.getElementById('status-text');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const modelInfoPanel = document.getElementById('model-info');
+        const toastContainer = document.getElementById('toast-container');
+        const sidebar = document.getElementById('sidebar');
+        const toggleSidebarBtn = document.getElementById('toggle-sidebar');
+        
+        // Control elements
+        const autoRotateToggle = document.getElementById('auto-rotate');
+        const wireframeToggle = document.getElementById('wireframe');
+        const showGridToggle = document.getElementById('show-grid');
+        const showShadowsToggle = document.getElementById('show-shadows');
+        
+        // Info elements
+        const verticesCount = document.getElementById('vertices-count');
+        const trianglesCount = document.getElementById('triangles-count');
+        const materialsCount = document.getElementById('materials-count');
+        const texturesCount = document.getElementById('textures-count');
+        const fileSize = document.getElementById('file-size');
+        
+        // Tab elements
+        const sidebarTabs = document.querySelectorAll('.sidebar-tab');
+        const sidebarSections = document.querySelectorAll('.sidebar-section');
+        
+        // Tool buttons
+        const resetCameraBtn = document.getElementById('reset-camera');
+        const screenshotBtn = document.getElementById('screenshot');
+        const fullscreenBtn = document.getElementById('fullscreen');
+        const modelInfoBtn = document.getElementById('model-info-btn');
+        
+        // Model buttons
+        const modelButtons = document.querySelectorAll('.model-btn');
+
+        // Initialize Three.js scene
+        function init() {
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(settings.backgroundColor);
+            
+            // Camera
+            camera = new THREE.PerspectiveCamera(75, sceneContainer.clientWidth / sceneContainer.clientHeight, 0.1, 1000);
+            camera.position.set(5, 5, 5);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+            renderer.setSize(sceneContainer.clientWidth, sceneContainer.clientHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            sceneContainer.appendChild(renderer.domElement);
+            
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = false;
+            
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 5);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 1024;
+            directionalLight.shadow.mapSize.height = 1024;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 50;
+            directionalLight.shadow.camera.left = -10;
+            directionalLight.shadow.camera.right = 10;
+            directionalLight.shadow.camera.top = 10;
+            directionalLight.shadow.camera.bottom = -10;
+            scene.add(directionalLight);
+            
+            const backLight = new THREE.DirectionalLight(0xffffff, 0.3);
+            backLight.position.set(-5, 5, -5);
+            scene.add(backLight);
+            
+            // Create a ground plane for shadows
+            const groundGeometry = new THREE.PlaneGeometry(100, 100);
+            const groundMaterial = new THREE.ShadowMaterial({ opacity: 0.2 });
+            const groundPlane = new THREE.Mesh(groundGeometry, groundMaterial);
+            groundPlane.rotation.x = -Math.PI / 2;
+            groundPlane.position.y = -0.01;
+            groundPlane.receiveShadow = true;
+            groundPlane.visible = false;
+            scene.add(groundPlane);
+            
+            // Start animation loop
+            animate();
+            
+            showStatus('3D Viewer ready');
+            
+            // Check URL parameters for auto-loading
+            checkURLParameters();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (settings.autoRotate && currentModel) {
+                currentModel.rotation.y += settings.rotationSpeed;
+            }
+            
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = sceneContainer.clientWidth / sceneContainer.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(sceneContainer.clientWidth, sceneContainer.clientHeight);
+        }
+
+        function showStatus(message, duration = 3000) {
+            statusText.textContent = message;
+            statusBar.classList.add('visible');
+            
+            clearTimeout(statusBar.timer);
+            statusBar.timer = setTimeout(() => {
+                statusBar.classList.remove('visible');
+            }, duration);
+        }
+
+        function showToast(type, title, message, duration = 5000) {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            
+            let iconSvg = '';
+            switch (type) {
+                case 'success':
+                    iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#06d6a0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
+                    break;
+                case 'warning':
+                    iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffd166" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>';
+                    break;
+                case 'error':
+                    iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef476f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
+                    break;
+                default:
+                    iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4361ee" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
+            }
+            
+            toast.innerHTML = `
+                <div class="toast-icon">${iconSvg}</div>
+                <div class="toast-content">
+                    <div class="toast-title">${title}</div>
+                    <div class="toast-message">${message}</div>
+                </div>
+            `;
+            
+            toastContainer.appendChild(toast);
+            void toast.offsetWidth;
+            
+            setTimeout(() => {
+                toast.classList.add('visible');
+            }, 10);
+            
+            setTimeout(() => {
+                toast.classList.remove('visible');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, duration);
+        }
+
+        function checkURLParameters() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const modelParam = urlParams.get('model');
+            
+            if (modelParam) {
+                loadModelFromCollection(modelParam);
+                // Update button state
+                const btn = document.querySelector(`[data-model="${modelParam}"]`);
+                if (btn) {
+                    btn.classList.add('active');
+                }
+            }
+        }
+
+        function loadModelFromCollection(modelName) {
+            const modelPath = `/models/${collection}/${modelName}`;
+            loadModelFromPath(modelPath, modelName);
+        }
+
+        function loadModelFromPath(modelPath, fileName) {
+            if (!fileName) fileName = modelPath.split('/').pop();
+            
+            currentFileName = fileName;
+            
+            if (currentModel) {
+                scene.remove(currentModel);
+                currentModel = null;
+            }
+            
+            loadingSpinner.style.display = 'block';
+            showStatus(`Loading ${fileName}...`);
+            
+            const loader = new THREE.GLTFLoader();
+            const dracoLoader = new THREE.DRACOLoader();
+            dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/draco/');
+            loader.setDRACOLoader(dracoLoader);
+            
+            loader.load(modelPath, (gltf) => {
+                loadingSpinner.style.display = 'none';
+                const model = gltf.scene;
+                
+                model.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        child.originalMaterial = child.material.clone();
+                    }
+                });
+                
+                const box = new THREE.Box3().setFromObject(model);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const scale = 5 / maxDim;
+                model.scale.setScalar(scale);
+                
+                model.position.sub(center.multiplyScalar(scale));
+                model.position.y = 0;
+                
+                scene.add(model);
+                currentModel = model;
+                
+                calculateModelStats(model);
+                modelInfoPanel.classList.add('visible');
+                
+                showToast('success', 'Success', `Model '${fileName}' loaded successfully!`, 5000);
+                showStatus('Model loaded', 2000);
+                
+                // Update URL
+                const url = new URL(window.location);
+                url.searchParams.set('model', fileName);
+                window.history.pushState({}, '', url);
+                
+            }, undefined, (error) => {
+                loadingSpinner.style.display = 'none';
+                showToast('error', 'Error', 'Failed to load model: ' + error.message);
+                showStatus('Load failed', 2000);
+            });
+        }
+
+        function loadModel(file) {
+            if (!file) return;
+            
+            const validExtensions = ['.glb', '.gltf'];
+            const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+            
+            if (!validExtensions.includes(fileExt)) {
+                showToast('error', 'Invalid File', 'Please upload a GLB or GLTF file.', 5000);
+                return;
+            }
+            
+            currentFileName = file.name;
+            currentFileSize = file.size;
+            
+            if (currentModel) {
+                scene.remove(currentModel);
+                currentModel = null;
+            }
+            
+            loadingSpinner.style.display = 'block';
+            showStatus('Loading model...');
+            
+            const loader = new THREE.GLTFLoader();
+            const dracoLoader = new THREE.DRACOLoader();
+            dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/draco/');
+            loader.setDRACOLoader(dracoLoader);
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const contents = e.target.result;
+                
+                loader.parse(contents, '', (gltf) => {
+                    loadingSpinner.style.display = 'none';
+                    const model = gltf.scene;
+                    
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            child.originalMaterial = child.material.clone();
+                        }
+                    });
+                    
+                    const box = new THREE.Box3().setFromObject(model);
+                    const center = box.getCenter(new THREE.Vector3());
+                    const size = box.getSize(new THREE.Vector3());
+                    
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    const scale = 5 / maxDim;
+                    model.scale.setScalar(scale);
+                    
+                    model.position.sub(center.multiplyScalar(scale));
+                    model.position.y = 0;
+                    
+                    scene.add(model);
+                    currentModel = model;
+                    
+                    calculateModelStats(model);
+                    modelInfoPanel.classList.add('visible');
+                    
+                    showToast('success', 'Success', `Model '${file.name}' loaded successfully!`, 5000);
+                    showStatus('Model loaded', 2000);
+                }, 
+                undefined,
+                (error) => {
+                    loadingSpinner.style.display = 'none';
+                    showToast('error', 'Error', 'Failed to load model: ' + error.message);
+                    showStatus('Load failed', 2000);
+                });
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        function calculateModelStats(model) {
+            let verticesTotal = 0;
+            let trianglesTotal = 0;
+            let materialsSet = new Set();
+            let texturesSet = new Set();
+            
+            model.traverse((child) => {
+                if (child.isMesh) {
+                    const position = child.geometry.attributes.position;
+                    if (position) {
+                        verticesTotal += position.count;
+                    }
+                    
+                    if (child.geometry.index !== null) {
+                        trianglesTotal += child.geometry.index.count / 3;
+                    } else {
+                        trianglesTotal += position.count / 3;
+                    }
+                    
+                    if (child.material) {
+                        if (Array.isArray(child.material)) {
+                            child.material.forEach(mat => materialsSet.add(mat));
+                        } else {
+                            materialsSet.add(child.material);
+                        }
+                    }
+                }
+            });
+            
+            verticesCount.textContent = verticesTotal.toLocaleString();
+            trianglesCount.textContent = Math.round(trianglesTotal).toLocaleString();
+            materialsCount.textContent = materialsSet.size;
+            texturesCount.textContent = texturesSet.size;
+            fileSize.textContent = currentFileSize ? formatFileSize(currentFileSize) : '-';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Event listeners
+        window.addEventListener('resize', onWindowResize);
+
+        // Model buttons
+        modelButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const modelName = btn.dataset.model;
+                modelButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                loadModelFromCollection(modelName);
+            });
+        });
+
+        // File upload
+        uploadBox.addEventListener('click', () => fileInput.click());
+        uploadBox.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadBox.style.borderColor = '#4361ee';
+        });
+        uploadBox.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadBox.style.borderColor = '#e0e0e0';
+        });
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.style.borderColor = '#e0e0e0';
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                loadModel(files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                loadModel(file);
+            }
+        });
+
+        // Controls
+        autoRotateToggle.addEventListener('change', (e) => {
+            settings.autoRotate = e.target.checked;
+        });
+
+        wireframeToggle.addEventListener('change', (e) => {
+            settings.wireframe = e.target.checked;
+            if (currentModel) {
+                currentModel.traverse((child) => {
+                    if (child.isMesh) {
+                        child.material.wireframe = settings.wireframe;
+                    }
+                });
+            }
+        });
+
+        // Sidebar tabs
+        sidebarTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetTab = tab.dataset.tab;
+                
+                sidebarTabs.forEach(t => t.classList.remove('active'));
+                sidebarSections.forEach(s => s.classList.remove('active'));
+                
+                tab.classList.add('active');
+                document.getElementById(`${targetTab}-section`).classList.add('active');
+            });
+        });
+
+        // Mobile sidebar toggle
+        toggleSidebarBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+        });
+
+        // Toolbar buttons
+        resetCameraBtn.addEventListener('click', () => {
+            camera.position.set(5, 5, 5);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        });
+
+        screenshotBtn.addEventListener('click', () => {
+            renderer.render(scene, camera);
+            const dataURL = renderer.domElement.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = currentFileName ? `${currentFileName}_screenshot.png` : 'screenshot.png';
+            link.href = dataURL;
+            link.click();
+        });
+
+        fullscreenBtn.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        });
+
+        modelInfoBtn.addEventListener('click', () => {
+            modelInfoPanel.classList.toggle('visible');
+        });
+
+        // Initialize the viewer
+        init();
+    </script>
+</body>
+</html>

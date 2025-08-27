@@ -1,0 +1,82 @@
+---
+// Handles short URLs like /product-development/3d-model-viewer/balora/moon
+// Redirects to /product-development/3d-model-viewer/?collection=balora&model=moon.glb
+
+export async function getStaticPaths() {
+  // Define known collections and their models for static generation
+  return [
+    // Balora collection
+    {params: {collection: 'balora', model: 'moon'}},
+    {params: {collection: 'balora', model: 'tt3'}},
+    
+    // Tests collection  
+    {params: {collection: 'Tests', model: 'moon'}},
+    
+    // SiliconWit collection
+    {params: {collection: 'siliconwit', model: 'spherical_cow'}},
+  ];
+}
+
+const { collection, model } = Astro.params;
+---
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Loading 3D Model...</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #f8f9fa;
+        }
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4361ee;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 1rem auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading">
+        <div class="spinner"></div>
+        <h2>Loading 3D Model</h2>
+        <p>Redirecting to model viewer...</p>
+        <p><strong>Collection:</strong> {collection}</p>
+        <p><strong>Model:</strong> {model}.glb</p>
+    </div>
+
+    <script define:vars={{collection, model}}>
+        // Redirect short URL format to standard query parameter format
+        // Example: /balora/moon -> /?collection=balora&model=moon.glb
+        
+        // Automatically append .glb extension
+        const redirectUrl = `/product-development/3d-model-viewer/?collection=${collection}&model=${model}.glb`;
+        
+        console.log(`Short URL redirect: ${window.location.href} → ${redirectUrl}`);
+        
+        // Use replace to avoid creating history entries
+        window.location.replace(redirectUrl);
+    </script>
+</body>
+</html>

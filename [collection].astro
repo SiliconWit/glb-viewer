@@ -1,58 +1,89 @@
 ---
-import fs from 'fs';
-import path from 'path';
+// Catch-all redirect for legacy 3D model viewer URLs
+// Handles URLs like /product-development/3d-model-viewer/balora/?model=moon.glb
 
-export function getStaticPaths() {
-  const modelsDir = path.join(process.cwd(), 'public', 'models');
-  const paths = [];
-  
-  try {
-    // Get all directories in public/models
-    const items = fs.readdirSync(modelsDir, { withFileTypes: true });
-    const collections = items
-      .filter(item => item.isDirectory())
-      .map(dir => dir.name);
-    
-    // Add paths for each collection
-    collections.forEach(collection => {
-      paths.push({ params: { collection: collection } });
-    });
-    
-    console.log('Generated static paths for 3D viewer collections:', paths);
-  } catch (error) {
-    console.error('Error reading models directory:', error);
-  }
-  
-  return paths;
+export async function getStaticPaths() {
+  return [
+    {params: {collection: 'balora'}},
+    {params: {collection: 'Tests'}},
+    {params: {collection: 'siliconwit'}},
+  ];
 }
 
 const { collection } = Astro.params;
-const { url } = Astro;
-const searchParams = new URLSearchParams(url.search);
-const model = searchParams.get('model');
-
-// Redirect to main viewer with collection and model parameters
-const redirectUrl = `/product-development/3d-model-viewer/?collection=${collection}&model=${model || ''}`;
+const url = Astro.url;
+const modelParam = url.searchParams.get('model');
 ---
 
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SiliconWit.COM 3D Model Viewer - {collection}</title>
-    <meta name="description" content={`3D Model Viewer for ${collection} collection - by SiliconWit.COM`}>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <script define:inline>
-        // Immediately redirect to main viewer with parameters
-        const urlParams = new URLSearchParams(window.location.search);
-        const model = urlParams.get('model') || '';
-        const collection = window.location.pathname.split('/').pop();
-        const redirectUrl = `/product-development/3d-model-viewer/?collection=${collection}&model=${model}`;
-        window.location.replace(redirectUrl);
-    </script>
+    <title>Redirecting to Model Viewer...</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #f8f9fa;
+        }
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4361ee;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 1rem auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-    <p>Redirecting to 3D Model Viewer...</p>
+    <div class="loading">
+        <div class="spinner"></div>
+        <h2>Redirecting to Updated Model Viewer</h2>
+        <p>Loading 3D model from legacy URL...</p>
+        {modelParam && <p><strong>Model:</strong> {modelParam}</p>}
+        {collection && <p><strong>Collection:</strong> {collection}</p>}
+    </div>
+
+    <script>
+        // Handle legacy URL redirection to query parameter format
+        // Extract collection from URL path: /product-development/3d-model-viewer/balora/ -> balora
+        const pathParts = window.location.pathname.split('/').filter(part => part.length > 0);
+        const collection = pathParts[pathParts.length - 1]; // Get last non-empty part (balora)
+        const urlParams = new URLSearchParams(window.location.search);
+        const modelParam = urlParams.get('model');
+        
+        let redirectUrl;
+        
+        if (modelParam && collection) {
+            // If both model and collection are specified, redirect to query parameter format
+            redirectUrl = `/product-development/3d-model-viewer/?collection=${collection}&model=${modelParam}`;
+        } else {
+            // Missing parameters, redirect to main viewer
+            redirectUrl = `/product-development/3d-model-viewer/`;
+        }
+        
+        console.log(`Legacy URL redirect: ${window.location.href} → ${redirectUrl}`);
+        console.log(`Extracted collection: ${collection}, model: ${modelParam}`);
+        
+        // Use replace to avoid creating history entries
+        window.location.replace(redirectUrl);
+    </script>
 </body>
 </html>

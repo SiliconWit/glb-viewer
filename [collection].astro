@@ -1,0 +1,58 @@
+---
+import fs from 'fs';
+import path from 'path';
+
+export function getStaticPaths() {
+  const modelsDir = path.join(process.cwd(), 'public', 'models');
+  const paths = [];
+  
+  try {
+    // Get all directories in public/models
+    const items = fs.readdirSync(modelsDir, { withFileTypes: true });
+    const collections = items
+      .filter(item => item.isDirectory())
+      .map(dir => dir.name);
+    
+    // Add paths for each collection
+    collections.forEach(collection => {
+      paths.push({ params: { collection: collection } });
+    });
+    
+    console.log('Generated static paths for 3D viewer collections:', paths);
+  } catch (error) {
+    console.error('Error reading models directory:', error);
+  }
+  
+  return paths;
+}
+
+const { collection } = Astro.params;
+const { url } = Astro;
+const searchParams = new URLSearchParams(url.search);
+const model = searchParams.get('model');
+
+// Redirect to main viewer with collection and model parameters
+const redirectUrl = `/product-development/3d-model-viewer/?collection=${collection}&model=${model || ''}`;
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SiliconWit.COM 3D Model Viewer - {collection}</title>
+    <meta name="description" content={`3D Model Viewer for ${collection} collection - by SiliconWit.COM`}>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <script define:inline>
+        // Immediately redirect to main viewer with parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const model = urlParams.get('model') || '';
+        const collection = window.location.pathname.split('/').pop();
+        const redirectUrl = `/product-development/3d-model-viewer/?collection=${collection}&model=${model}`;
+        window.location.replace(redirectUrl);
+    </script>
+</head>
+<body>
+    <p>Redirecting to 3D Model Viewer...</p>
+</body>
+</html>

@@ -1088,10 +1088,11 @@
         </a>
 
         <nav class="desktop-nav-menu">
-            <a href="/" class="desktop-nav-link">Home</a>
             <a href="/research/" class="desktop-nav-link">Research</a>
             <a href="/education/" class="desktop-nav-link">Education</a>
             <a href="/product-development/" class="desktop-nav-link">Product Development</a>
+            <a href="/blog/" class="desktop-nav-link">Blog</a>
+            <a href="/contributors/" class="desktop-nav-link">Contributors</a>
         </nav>
 
         <div class="sl-nav-controls">
@@ -1141,7 +1142,6 @@
     <!-- Mobile Menu Overlay -->
     <div class="mobile-menu-overlay" id="mobile-menu-overlay">
         <nav class="mobile-nav-links">
-            <a href="/" class="mobile-nav-link">Home</a>
             <a href="/research/" class="mobile-nav-link">Research</a>
             <a href="/education/" class="mobile-nav-link">Education</a>
             <a href="/product-development/" class="mobile-nav-link current">Product Development</a>
@@ -1202,18 +1202,18 @@
                     </div>
                 </div>
 
-                <!-- Local Models -->
+                <!-- Featured Models -->
                 <div class="control-section">
-                    <h3>📁 Your Models</h3>
+                    <h3>⭐ Featured Models</h3>
 
-                    <div class="model-preset" data-url="/models/spherical_cow.glb">
+                    <div class="model-preset" data-url="/models/siliconwit/spherical-cow.glb">
                         <div class="model-preset-icon">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24" height="24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                             </svg>
                         </div>
                         <div class="model-preset-info">
-                            <div class="model-preset-name">Spherical Cow</div>
+                            <div class="model-preset-name">Spherical Cow (SiliconWit)</div>
                             <div class="model-preset-size">Local Model</div>
                         </div>
                     </div>
@@ -1239,18 +1239,6 @@
                         <div class="model-preset-info">
                             <div class="model-preset-name">TT3 (Balora)</div>
                             <div class="model-preset-size">Local Model</div>
-                        </div>
-                    </div>
-
-                    <div class="model-preset" data-url="/models/torsion_shaft.glb">
-                        <div class="model-preset-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24" height="24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                        </div>
-                        <div class="model-preset-info">
-                            <div class="model-preset-name">Torsion Shaft</div>
-                            <div class="model-preset-size">Engineering</div>
                         </div>
                     </div>
                 </div>
@@ -2080,8 +2068,8 @@
             loadModel(modelUrl);
             console.log('Loading model from URL parameter:', modelUrl);
         } else {
-            // Load default model
-            loadModel('https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb');
+            // Load default model - Spherical Cow (SiliconWit)
+            loadModel('/models/siliconwit/spherical-cow.glb');
         }
 
         // ============================================
